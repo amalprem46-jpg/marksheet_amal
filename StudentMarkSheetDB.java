@@ -4,11 +4,8 @@ import java.sql.*;
 class Student {
     String name;
     int id;
-    protected static int idCounter = 100000000;
 
-    void getStudentDetails(Scanner sc) {
-        id = idCounter++;
-
+    void getStudentName(Scanner sc) {
         while (true) {
             try {
                 System.out.print("Enter Student Name: ");
@@ -42,7 +39,9 @@ class MarkSheet extends Student {
                 System.out.print("Enter subject 3 mark: ");
                 m3 = Integer.parseInt(sc.nextLine());
 
-                if (m1 < 0 || m1 > 100 || m2 < 0 || m2 > 100 || m3 < 0 || m3 > 100)
+                if (m1 < 0 || m1 > 100 ||
+                    m2 < 0 || m2 > 100 ||
+                    m3 < 0 || m3 > 100)
                     throw new Exception("Marks must be between 0 and 100!");
 
                 break;
@@ -65,11 +64,12 @@ public class StudentMarkSheetDB {
 
     static Scanner sc = new Scanner(System.in);
 
-    // 🔹 Database Connection Method
+    // 🔹 Database Connection
     static Connection getConnection() throws Exception {
         return DriverManager.getConnection(
                 "jdbc:mysql://localhost:3306/studentdb",
-                "studentuser","Student@123"   
+                "studentuser",
+                "Student@123"
         );
     }
 
@@ -90,6 +90,9 @@ public class StudentMarkSheetDB {
                     searchStudentById();
                     break;
                 case "4":
+                    updateStudent();
+                    break;
+                case "5":
                     System.out.println("Exiting program. Goodbye!");
                     sc.close();
                     return;
@@ -104,11 +107,12 @@ public class StudentMarkSheetDB {
         System.out.println("1. Add new student(s)");
         System.out.println("2. View all students");
         System.out.println("3. Search student by ID");
-        System.out.println("4. Exit");
+        System.out.println("4. Update student");
+        System.out.println("5. Exit");
         System.out.print("Enter your choice: ");
     }
 
-    // 🔹 INSERT
+    // 🔹 INSERT (AUTO_INCREMENT handles ID)
     static void addStudents() {
         int n;
 
@@ -122,21 +126,20 @@ public class StudentMarkSheetDB {
 
         try (Connection con = getConnection()) {
 
-            String sql = "INSERT INTO students (id, name, m1, m2, m3) VALUES (?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO students (name, m1, m2, m3) VALUES (?, ?, ?, ?)";
             PreparedStatement ps = con.prepareStatement(sql);
 
             for (int i = 0; i < n; i++) {
                 System.out.println("\nEnter Details of Student " + (i + 1));
 
                 MarkSheet student = new MarkSheet();
-                student.getStudentDetails(sc);
+                student.getStudentName(sc);
                 student.getMarks(sc);
 
-                ps.setInt(1, student.id);
-                ps.setString(2, student.name);
-                ps.setInt(3, student.m1);
-                ps.setInt(4, student.m2);
-                ps.setInt(5, student.m3);
+                ps.setString(1, student.name);
+                ps.setInt(2, student.m1);
+                ps.setInt(3, student.m2);
+                ps.setInt(4, student.m3);
 
                 ps.executeUpdate();
                 System.out.println("Student added successfully!");
@@ -147,7 +150,7 @@ public class StudentMarkSheetDB {
         }
     }
 
-    // 🔹 SELECT ALL
+    // 🔹 VIEW ALL
     static void viewAllStudents() {
         try (Connection con = getConnection()) {
 
@@ -202,6 +205,57 @@ public class StudentMarkSheetDB {
             } else {
                 System.out.println("Student not found.");
             }
+
+        } catch (Exception e) {
+            System.out.println("Database Error: " + e.getMessage());
+        }
+    }
+
+    // 🔹 UPDATE
+    static void updateStudent() {
+        System.out.print("Enter student ID to update: ");
+
+        int updateId;
+        try {
+            updateId = Integer.parseInt(sc.nextLine());
+        } catch (Exception e) {
+            System.out.println("Invalid ID format.");
+            return;
+        }
+
+        try (Connection con = getConnection()) {
+
+            String checkSql = "SELECT * FROM students WHERE id = ?";
+            PreparedStatement checkPs = con.prepareStatement(checkSql);
+            checkPs.setInt(1, updateId);
+            ResultSet rs = checkPs.executeQuery();
+
+            if (!rs.next()) {
+                System.out.println("Student not found.");
+                return;
+            }
+
+            System.out.println("Enter new details:");
+
+            MarkSheet student = new MarkSheet();
+            student.getStudentName(sc);
+            student.getMarks(sc);
+
+            String updateSql = "UPDATE students SET name=?, m1=?, m2=?, m3=? WHERE id=?";
+            PreparedStatement ps = con.prepareStatement(updateSql);
+
+            ps.setString(1, student.name);
+            ps.setInt(2, student.m1);
+            ps.setInt(3, student.m2);
+            ps.setInt(4, student.m3);
+            ps.setInt(5, updateId);
+
+            int rows = ps.executeUpdate();
+
+            if (rows > 0)
+                System.out.println("Student updated successfully!");
+            else
+                System.out.println("Update failed.");
 
         } catch (Exception e) {
             System.out.println("Database Error: " + e.getMessage());
